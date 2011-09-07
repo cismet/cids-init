@@ -140,7 +140,8 @@ CREATE TABLE cs_cat_node (
     policy integer,
     derive_permissions_from_class BOOLEAN DEFAULT true,
     iconfactory integer,
-    icon character varying(512)
+    icon character varying(512),
+    artifical_id varchar(200)
 );
 
 
