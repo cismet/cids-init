@@ -44,6 +44,17 @@ CREATE TABLE cs_all_attr_mapping (
 
 
 --
+-- Name: cs_attr_object; Type: TABLE; Schema: public; Owner: -; Tablespace:
+--
+
+CREATE TABLE cs_attr_object (
+    class_id integer NOT NULL,
+    object_id integer NOT NULL,
+    attr_class_id integer NOT NULL,
+    attr_object_id integer NOT NULL
+);
+
+--
 -- Name: cs_attr; Type: TABLE; Schema: public; Owner: -; Tablespace:
 --
 
