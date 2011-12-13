@@ -1365,25 +1365,25 @@ FROM
     (
         (
         SELECT DISTINCT
-            cs_all_attr_mapping.class_id,
-            cs_all_attr_mapping.object_id,
+            cs_attr_object.class_id,
+            cs_attr_object.object_id,
             geom.geo_field
         FROM
             geom,
-            cs_all_attr_mapping
+            cs_attr_object
         WHERE
             (
                 (
-                    cs_all_attr_mapping.attr_class_id = (SELECT id FROM cs_class WHERE table_name = 'GEOM')
+                    cs_attr_object.attr_class_id = (SELECT id FROM cs_class WHERE table_name = 'GEOM')
                 )
                 AND
                 (
-                    cs_all_attr_mapping.attr_object_id = geom.id
+                    cs_attr_object.attr_object_id = geom.id
                 )
             )
         ORDER BY
-            cs_all_attr_mapping.class_id,
-            cs_all_attr_mapping.object_id,
+            cs_attr_object.class_id,
+            cs_attr_object.object_id,
             geom.geo_field
         )
         x
