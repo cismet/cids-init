@@ -1409,6 +1409,12 @@ ORDER BY
     x.geo_field;
 
 
+CREATE VIEW cs_class_hierarchy AS 
+ SELECT father_child.father, father_child.child
+   FROM ( SELECT a.foreign_key_references_to AS child, a.class_id AS father, c.primary_key_field AS pk, c.table_name, a.field_name, a.isarray
+           FROM cs_attr a, cs_class c
+          WHERE a.foreign_key = true AND a.class_id = c.id AND a.indexed = true) father_child;
+
 
 -- new tables depend on several other constraints thus they are created last
 
