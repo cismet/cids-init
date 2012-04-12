@@ -54,6 +54,19 @@ CREATE TABLE cs_attr_object (
     attr_object_id integer NOT NULL
 );
 
+
+
+CREATE TABLE cs_attr_object_derived
+(
+  class_id integer NOT NULL,
+  object_id integer NOT NULL,
+  attr_class_id integer NOT NULL,
+  attr_object_id integer NOT NULL
+)
+WITH (
+  OIDS=FALSE
+);
+
 --
 -- Name: cs_attr; Type: TABLE; Schema: public; Owner: -; Tablespace:
 --
@@ -1141,6 +1154,52 @@ CREATE INDEX ob_idx ON cs_cat_node USING btree (object_id);
 CREATE INDEX obj_cl_idx ON cs_cat_node USING btree (class_id, object_id);
 
 
+CREATE INDEX attr_object_index
+  ON cs_attr_object
+  USING btree
+  (class_id, object_id, attr_class_id, attr_object_id);
+
+
+-- Index: attr_object_derived_index
+
+CREATE INDEX attr_object_derived_index
+  ON cs_attr_object_derived
+  USING btree
+  (class_id, object_id, attr_class_id, attr_object_id);
+
+-- Index: attr_object_derived_index_acid_aoid
+
+
+CREATE INDEX attr_object_derived_index_acid_aoid
+  ON cs_attr_object_derived
+  USING btree
+  (attr_class_id, attr_object_id);
+
+-- Index: attr_object_derived_index_cid_oid
+
+
+CREATE INDEX attr_object_derived_index_cid_oid
+  ON cs_attr_object_derived
+  USING btree
+  (class_id, object_id);
+
+-- Index: cs_attr_string_class_idx
+
+CREATE INDEX cs_attr_string_class_idx
+  ON cs_attr_string
+  USING btree
+  (class_id);
+
+-- Index: cs_attr_string_object_idx
+
+
+CREATE INDEX cs_attr_string_object_idx
+  ON cs_attr_string
+  USING btree
+  (object_id);
+
+
+
 --
 -- PostgreSQL database dump complete
 --
@@ -1441,6 +1500,210 @@ CREATE TABLE cs_history (
 
     PRIMARY KEY (class_id, object_id, valid_from)
 );
+
+
+
+
+CREATE OR REPLACE FUNCTION reindexpure(classid integer)
+  RETURNS void AS
+$BODY$
+declare
+	attr cs_attr%ROWTYPE;
+	obj RECORD;
+	ids RECORD;
+	objects RECORD;
+	class cs_class%ROWTYPE;
+	query TEXT;
+	secQuery TEXT;
+	attrClass cs_class%ROWTYPE;
+	attrFieldName TEXT;
+	objectCount INTEGER;
+begin
+	CREATE TEMP TABLE cs_attr_object_temp (class_id integer, object_id integer, attr_class_id integer, attr_object_id integer);
+	CREATE TEMP TABLE cs_attr_string_temp (class_id integer, attr_id integer, object_id integer, string_val text);
+	
+	SELECT * INTO class FROM cs_class WHERE id = classId;
+
+	FOR attr IN SELECT * FROM cs_attr WHERE class_id = classId LOOP	
+		--RAISE NOTICE '%     %', attr.field_name, class.table_name ;
+		IF attr.indexed THEN
+			query = 'SELECT ' || class.primary_key_field || ' AS pField, cast(' ||  attr.field_name || ' as text) AS fName FROM ' || class.table_name;
+			FOR obj IN EXECUTE query LOOP
+				IF attr.foreign_key THEN
+					SELECT cs_class.* INTO attrClass FROM cs_class, cs_type WHERE cs_type.class_id = cs_class.id AND cs_type.id = attr.type_id;
+					IF attrClass.array_link THEN
+						secQuery = 'SELECT id as id FROM ' || attrClass.table_name || ' WHERE ' || attr.array_key  || ' =  ' || obj.pField;
+						FOR ids IN EXECUTE secQuery LOOP
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrClass.id, ids.id);
+						END LOOP;
+					ELSE
+						secQuery = 'select ' || class.table_name || '.' || attr.field_name || ' as fieldName from ' || class.table_name || ', ' || attrclass.table_name || ' WHERE ' || class.table_name || '.' || class.primary_key_field || ' = ' || obj.pField || ' AND ' || class.table_name || '.' || attr.field_name || ' = ' || attrClass.table_name || '.' || attrClass.primary_key_field;
+						EXECUTE secQuery into objects;
+						GET DIAGNOSTICS objectCount = ROW_COUNT;
+						IF objectCount = 1 THEN
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrClass.id, objects.fieldName);
+						ELSE
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrclass.id, -1);
+						END IF;
+					END IF;
+				ELSE 
+					IF obj.fName is not null THEN
+						INSERT INTO cs_attr_string_temp (class_id, attr_id, object_id, string_val) VALUES (classId, attr.id, obj.pField, obj.fName);
+					END IF;
+				END IF;
+			END LOOP;
+		END IF;
+	END LOOP;
+
+	DELETE FROM cs_attr_object WHERE class_id = class.id;
+	DELETE FROM cs_attr_string WHERE class_id = class.id;
+	INSERT INTO cs_attr_object ( class_id, object_id, attr_class_id, attr_object_id) (SELECT class_id, object_id, attr_class_id, attr_object_id FROM cs_attr_object_temp);
+	INSERT INTO cs_attr_string ( class_id, attr_id, object_id, string_val) (SELECT class_id, attr_id, object_id, string_val FROM cs_attr_string_temp);
+	DROP TABLE cs_attr_object_temp;
+	DROP TABLE cs_attr_string_temp;
+	
+end
+$BODY$
+  LANGUAGE 'plpgsql' VOLATILE
+  COST 100;
+
+
+CREATE OR REPLACE FUNCTION reindexderivedobjects(classid integer)
+  RETURNS void AS
+$BODY$
+declare
+	ids INTEGER;
+begin
+	CREATE TEMP TABLE cs_attr_object_derived_temp (class_id integer, object_id integer, attr_class_id integer, attr_object_id integer);
+	INSERT INTO   cs_attr_object_derived_temp WITH recursive derived_index
+	       (
+		      xocid,
+		      xoid ,
+		      ocid ,
+		      oid  ,
+		      acid ,
+		      aid  ,
+		      depth
+	       )
+	       AS
+	       ( SELECT class_id,
+		       object_id,
+		       class_id ,
+		       object_id,
+		       class_id ,
+		       object_id,
+		       0
+	       FROM    cs_attr_object
+	       WHERE   class_id=classId
+	       
+	       UNION ALL
+	       
+	       SELECT di.xocid          ,
+		      di.xoid           ,
+		      aam.class_id      ,
+		      aam.object_id     ,
+		      aam.attr_class_id ,
+		      aam.attr_object_id,
+		      di.depth+1
+	       FROM   cs_attr_object aam,
+		      derived_index di
+	       WHERE  aam.class_id =di.acid
+	       AND    aam.object_id=di.aid
+	       )
+	SELECT DISTINCT xocid,
+			xoid ,
+			acid ,
+			aid
+	FROM            derived_index
+	ORDER BY        1,2,3,4 limit 1000000000;
+	DELETE FROM cs_attr_object_derived WHERE class_id = classid;
+	INSERT INTO cs_attr_object_derived ( class_id, object_id, attr_class_id, attr_object_id) (SELECT class_id, object_id, attr_class_id, attr_object_id FROM cs_attr_object_derived_temp);
+	DROP TABLE cs_attr_object_derived_temp;
+end
+$BODY$
+  LANGUAGE 'plpgsql' VOLATILE
+  COST 100;
+
+
+CREATE OR REPLACE FUNCTION "reindex"()
+  RETURNS void AS
+$BODY$
+declare
+	ids INTEGER;
+begin
+	FOR ids IN SELECT id FROM cs_class LOOP
+		RAISE NOTICE 'reindex %', ids;
+		PERFORM reindexPure(ids);
+	END LOOP;
+
+	FOR ids IN SELECT id FROM cs_class where indexed LOOP
+		RAISE NOTICE 'reindexDerived %', ids;
+		PERFORM reindexDerivedObjects(ids);
+	END LOOP;
+end
+$BODY$
+  LANGUAGE 'plpgsql' VOLATILE
+  COST 100;
+
+
+CREATE OR REPLACE FUNCTION "reindex"(class_id integer)
+  RETURNS void AS
+$BODY$
+declare
+	ids INTEGER;
+begin
+	FOR ids IN WITH recursive derived_child(father,child,depth) AS
+                    ( SELECT father,
+                            father ,
+                            0
+                    FROM    cs_class_hierarchy
+                    WHERE   father IN (class_id)
+                    
+                    UNION ALL
+                    
+                    SELECT ch.father,
+                           ch.child ,
+                           dc.depth+1
+                    FROM   derived_child dc,
+                           cs_class_hierarchy ch
+                    WHERE  ch.father=dc.child
+                    )
+             SELECT DISTINCT child
+             FROM            derived_child LIMIT 100 LOOP
+		RAISE NOTICE 'reindex  %', ids ;
+		PERFORM reindexPure(ids);
+	END LOOP;
+
+	FOR ids IN WITH recursive derived_child(father,child,depth) AS
+                    ( SELECT father,
+                            father ,
+                            0
+                    FROM    cs_class_hierarchy
+                    WHERE   father IN (class_id)
+                    
+                    UNION ALL
+                    
+                    SELECT ch.father,
+                           ch.child ,
+                           dc.depth+1
+                    FROM   derived_child dc,
+                           cs_class_hierarchy ch
+                    WHERE  ch.father=dc.child
+                    )
+             SELECT DISTINCT child
+             FROM            derived_child dc join cs_class cc on (cc.id = dc.child) where cc.indexed LIMIT 100 LOOP
+		RAISE NOTICE 'reindexDerivedObjects  %', ids ;
+		PERFORM reindexDerivedObjects(ids);
+	END LOOP;
+end
+$BODY$
+  LANGUAGE 'plpgsql' VOLATILE
+  COST 100;
+
+
+
+
+
 
 
 --
