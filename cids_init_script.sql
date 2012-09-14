@@ -1338,37 +1338,6 @@ INSERT INTO cs_type ( name, class_id, complex_type, descr, editor, renderer) VAL
 
 --- suche
 
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (1, 'full_text_search', '1', 'Select distinct class_id,object_id from cs_attr_string where lower(string_val) like lower(''%?%'') and class_id in ?', 1, '0', '1', '1', '0', '0', '1');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (4, 'get_all_nodes', '1', 'select * from (cs_cat_node as n left outer  join URL as u on (n.descr=u.id)  )left outer join url_base b on( u.url_base_id =b.id)', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (5, 'get_all_classes', '1', 'select c.id, c.name ,descr,class_icon_id,object_icon_id,table_name,primary_key_field,indexed,toStringClass.qualifier as toStringQualifier,EditorClass.qualifier as EditorQualifier,RendererClass.qualifier as RendererQualifier,c.array_link,c.policy,c.attribute_policy  from cs_class as c  left outer join cs_java_class as toStringClass on (c.tostring =toStringClass.id) left outer join cs_java_class as EditorClass on (c.editor=EditorClass.id) left outer join cs_java_class as RendererClass on (c.renderer=RendererClass.id)', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (6, 'get_all_links', '1', 'select id_from,id_to,d.name as domain_to from cs_cat_link,cs_domain as d where domain_to = d.id', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (7, 'get_all_class_attributes', '1', 'select * from cs_class_attr', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (8, 'count_classes', '1', 'select count(*) from cs_class', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (9, 'count_nodes', '1', 'select count(*) from cs_cat_node', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (11, 'count_links', '1', 'select count(*) from cs_cat_link', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (12, 'get_all_class_method_ids', '1', 'select * from cs_method_class_assoc', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (13, 'get_all_methods', '1', 'select * from cs_method', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (14, 'count_methods', '1', 'select count(*) from cs_method', 1, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (15, 'get_all_images', '1', 'select * from cs_icon', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (16, 'count_images', '1', 'select count(*) from cs_icon', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (17, 'get_all_users', '1', 'select  id,login_name,password,last_pwd_change,administrator from cs_usr', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (18, 'get_all_usergroups', '1', 'select  id ,name, descr,  domain from cs_ug order by name', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (19, 'get_all_memberships', '1', 'select login_name, ug.name as ug , ''LOCAL'' as ugDomain  from cs_ug_membership as m,cs_usr as u ,cs_ug as ug  where u.id=m.usr_id and ug.id=m.ug_id', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (20, 'verify_user_password', '1', 'select count(*) from cs_usr where trim(lower(login_name)) = ''?'' AND trim(lower(password)) = ''?''', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (21, 'change_user_password', '1', 'update cs_usr set password = ''?'', last_pwd_change = ''now'' where lower(login_name) = ''?'' AND lower(password) = ''?'' ', 2, '1', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (22, 'get_all_class_permissions', '1', 'select
-                        ug.name as ug_name, d.name  as domainname,cp.permission , p.key,cp.class_id,cp.ug_id  as ug_id
-                    from
-                        cs_ug_class_perm cp ,cs_permission p,cs_ug as ug , cs_domain as d
-                    where
-                        cp.permission=p.id and cp.ug_id = ug.id  and ug.domain=d.id', 1, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (23, 'get_all_class_attribute_permissions', '1', 'select ug_id,d.name,attr_id from cs_ug_attr_perm as p,cs_attr as a,cs_domain as d  WHERE attr_id = a.id and type_attr = ''C''  and d.id=p.domain', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (24, 'get_all_method_permissions', '1', 'select distinct m.method_id, plugin_id, u.id as ug_id , d.name as ls  from cs_ug_method_perm as p,cs_method  as m, cs_ug as u,cs_domain as d  where m.id =p.method_id and u.id=p.ug_id and u.domain=d.id', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (25, 'get_all_node_permissions', '1', 'select * from cs_ug_cat_node_perm', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (26, 'get_all_object_attribute_permissions', '1', 'select cs_ug.id,d.name,attr_id from cs_ug_attr_perm,cs_attr, cs_domain as d WHERE attr_id = id and d.id=cs_ug.domain', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (27, 'get_attribute_info', '1', 'select a.*,ts.qualifier as toStringString,e.qualifier as editor_class,s.qualifier as from_string_class , ce.qualifier as complexeditorclass  from cs_attr as a  left outer join cs_java_class as e on( editor = e.id )  left outer join cs_java_class as s on(from_string = s.id ) left outer join cs_java_class as ce on(complex_editor = ce.id ) left outer join cs_java_class as ts  on(a.tostring = ts.id ) order by a.class_id, a.pos', 2, '0', '0', '0', '0', '0', '0');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (45, 'GEOSEARCH', '1', 'select * from GEOSUCHE where class_id in ? and intersects(geo_field ,geometryfromtext(''SRID=-1;?))''', 1, '0', '1', '1', '0', '1', '1');
-INSERT INTO public.cs_query (id, name, descr, statement, result, is_update, is_union, is_root, is_batch, conjunction, is_search) VALUES (46, 'TEXTSEARCH', '1', 'select  distinct class_id,object_id,name  from TEXTSEARCH where lower(string_val) like lower(''%?%'') and class_id in ?', 1, '0', '1', '1', '0', '1', '1');
 
 --- views die von der suche gebraucht werden
 
@@ -1806,12 +1775,6 @@ CREATE TABLE cs_config_attr_jt (
 INSERT INTO cs_config_attr_type (type, descr) VALUES ('C', 'regular configuration attribute, a simple string value');
 INSERT INTO cs_config_attr_type (type, descr) VALUES ('A', 'action tag configuration attribute, value of no relevance');
 INSERT INTO cs_config_attr_type (type, descr) VALUES ('X', 'XML configuration attribute, XML content wrapped by some root element');
-
-
-INSERT INTO public.cs_query_parameter (id, query_id, param_key, descr, is_query_result, type_id, query_position) VALUES (58, 45, 'cs_classids', '1', '0', 1, 0);
-INSERT INTO public.cs_query_parameter (id, query_id, param_key, descr, is_query_result, type_id, query_position) VALUES (59, 45, 'polygon', '1', '0', 1, 1);
-INSERT INTO public.cs_query_parameter (id, query_id, param_key, descr, is_query_result, type_id, query_position) VALUES (60, 46, 'cs_classids', '1', '0', 1, 1);
-INSERT INTO public.cs_query_parameter (id, query_id, param_key, descr, is_query_result, type_id, query_position) VALUES (61, 46, 'text', '1', '0', 1, 0);
 
 -- rechte
 INSERT INTO public.cs_policy (id, name) VALUES (0, 'STANDARD');
