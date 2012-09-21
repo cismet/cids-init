@@ -99,17 +99,6 @@ CREATE TABLE cs_attr (
 
 
 --
--- Name: cs_attr_string_sequence; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE cs_attr_string_sequence
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
-
---
 -- Name: cs_attr_string; Type: TABLE; Schema: public; Owner: -; Tablespace:
 --
 
@@ -118,7 +107,6 @@ CREATE TABLE cs_attr_string (
     attr_id integer NOT NULL,
     object_id integer NOT NULL,
     string_val text NOT NULL,
-    id integer DEFAULT NEXTVAL('cs_attr_string_sequence'::regclass) NOT NULL
 );
 
 
@@ -848,13 +836,6 @@ ALTER TABLE ONLY cs_ug_class_perm
 ALTER TABLE ONLY cs_all_attr_mapping
     ADD CONSTRAINT cs_all_attr_mapping_pkey PRIMARY KEY (id);
 
-
---
--- Name: cs_attr_string_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace:
---
-
-ALTER TABLE ONLY cs_attr_string
-    ADD CONSTRAINT cs_attr_string_pkey PRIMARY KEY (id);
 
 
 --
