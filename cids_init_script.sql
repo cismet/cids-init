@@ -98,6 +98,7 @@ CREATE TABLE cs_attr (
 );
 
 
+
 --
 -- Name: cs_attr_string; Type: TABLE; Schema: public; Owner: -; Tablespace:
 --
@@ -106,7 +107,7 @@ CREATE TABLE cs_attr_string (
     class_id integer NOT NULL,
     attr_id integer NOT NULL,
     object_id integer NOT NULL,
-    string_val text NOT NULL,
+    string_val text NOT NULL
 );
 
 
@@ -837,7 +838,6 @@ ALTER TABLE ONLY cs_all_attr_mapping
     ADD CONSTRAINT cs_all_attr_mapping_pkey PRIMARY KEY (id);
 
 
-
 --
 -- Name: cs_cat_link_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace:
 --
@@ -1451,7 +1451,49 @@ CREATE TABLE cs_history (
     PRIMARY KEY (class_id, object_id, valid_from)
 );
 
+CREATE TABLE cs_stringrepcache
+(
+  class_id integer NOT NULL,
+  object_id integer NOT NULL,
+  stringrep character varying(512),
+  CONSTRAINT cid_oid PRIMARY KEY (class_id , object_id )
+)
+WITH (
+  OIDS=FALSE
+);
 
+CREATE OR REPLACE FUNCTION recreate_stringrepcache(classid integer)
+  RETURNS void AS
+$BODY$
+begin
+	BEGIN
+	delete from cs_stringrepcache where class_id = classid;
+	execute('insert into cs_stringrepcache (class_id,object_id,stringrep) select '||class_id||','||attr_value) from cs_class_attr where attr_key='tostringcache' and class_id = classid;
+	EXCEPTION WHEN SYNTAX_ERROR_OR_ACCESS_RULE_VIOLATION OR DATA_EXCEPTION OR PROGRAM_LIMIT_EXCEEDED THEN
+		RAISE WARNING 'Error occurs while recreating the stringrepcache for class %.', classid;
+		RAISE WARNING '% %', SQLERRM, SQLSTATE;
+		RETURN;
+	END;
+end
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
+
+CREATE OR REPLACE FUNCTION recreate_stringrepcache()
+  RETURNS void AS
+$BODY$
+declare
+	ids INTEGER;
+begin
+	FOR ids IN SELECT c.id FROM cs_class c, cs_class_attr a where c.id = a.class_id and a.attr_key='tostringcache' LOOP
+		RAISE NOTICE 'reindex %', ids;
+		PERFORM recreate_stringrepcache(ids);
+	END LOOP;
+end
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
 
 
 CREATE OR REPLACE FUNCTION reindexpure(classid integer)
