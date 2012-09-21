@@ -98,16 +98,6 @@ CREATE TABLE cs_attr (
 );
 
 
---
--- Name: cs_attr_string_sequence; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE cs_attr_string_sequence
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
 
 --
 -- Name: cs_attr_string; Type: TABLE; Schema: public; Owner: -; Tablespace:
@@ -117,8 +107,7 @@ CREATE TABLE cs_attr_string (
     class_id integer NOT NULL,
     attr_id integer NOT NULL,
     object_id integer NOT NULL,
-    string_val text NOT NULL,
-    id integer DEFAULT NEXTVAL('cs_attr_string_sequence'::regclass) NOT NULL
+    string_val text NOT NULL
 );
 
 
