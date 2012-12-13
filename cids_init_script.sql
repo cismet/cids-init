@@ -582,7 +582,8 @@ CREATE TABLE cs_ug (
     id integer DEFAULT NEXTVAL('cs_ug_sequence'::regclass) NOT NULL,
     name character varying(32) NOT NULL,
     descr text,
-    domain integer NOT NULL
+    domain integer NOT NULL,
+    prio integer NOT NULL
 );
 
 
@@ -1793,6 +1794,32 @@ CREATE TABLE cs_config_attr_jt (
     UNIQUE ( usr_id, ug_id, dom_id, key_id)
 );
 
+
+--
+-- Name: cs_config_attr_exempt_sequence; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE cs_config_attr_exempt_sequence
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+--
+-- Name: cs_config_attr_exempt; Type: TABLE; Schema: public; Owner: -; Tablespace:
+--
+
+CREATE TABLE cs_config_attr_exempt (
+    id     INTEGER       PRIMARY KEY DEFAULT NEXTVAL('cs_config_attr_exempt_sequence'),
+    usr_id INTEGER       NOT NULL,
+    key_id INTEGER,
+    ug_id  INTEGER       NOT NULL,
+    FOREIGN KEY (usr_id)  REFERENCES cs_usr,
+    FOREIGN KEY (key_id)  REFERENCES cs_config_attr_key,
+    FOREIGN KEY (ug_id)   REFERENCES cs_ug
+);
+
 -- default config attr types
 
 INSERT INTO cs_config_attr_type (type, descr) VALUES ('C', 'regular configuration attribute, a simple string value');
@@ -1817,7 +1844,7 @@ INSERT INTO public.cs_permission (id, KEY, description) VALUES (1, 'write', 'Sch
 
 -- Inserts zum Anlegen eines Standardbenutzers admin und einer neuen Benutzergruppe Administratoren
 INSERT INTO cs_domain (name) VALUES('LOCAL');
-INSERT INTO cs_ug (name, domain) VALUES ('Administratoren', (SELECT id FROM cs_domain WHERE name = 'LOCAL'));
+INSERT INTO cs_ug (name, domain, prio) VALUES ('Administratoren', (SELECT id FROM cs_domain WHERE name = 'LOCAL'), 0);
 INSERT INTO cs_usr(login_name,password,last_pwd_change,administrator) VALUES('admin','cismet',(SELECT CURRENT_TIMESTAMP),True);
 INSERT INTO cs_ug_membership (ug_id,usr_id) VALUES ((SELECT id FROM cs_ug WHERE name ='Administratoren'),(SELECT id FROM cs_usr WHERE login_name ='admin'));
 INSERT INTO cs_ug (name, domain) VALUES ('Gäste', (SELECT id FROM cs_domain WHERE name = 'LOCAL'));
