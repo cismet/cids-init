@@ -583,7 +583,8 @@ CREATE TABLE cs_ug (
     name character varying(32) NOT NULL,
     descr text,
     domain integer NOT NULL,
-    prio integer NOT NULL
+    prio integer NOT NULL,
+    UNIQUE ( prio )
 );
 
 
@@ -1817,7 +1818,8 @@ CREATE TABLE cs_config_attr_exempt (
     ug_id  INTEGER       NOT NULL,
     FOREIGN KEY (usr_id)  REFERENCES cs_usr,
     FOREIGN KEY (key_id)  REFERENCES cs_config_attr_key,
-    FOREIGN KEY (ug_id)   REFERENCES cs_ug
+    FOREIGN KEY (ug_id)   REFERENCES cs_ug,
+    UNIQUE ( usr_id, key_id )
 );
 
 -- default config attr types
