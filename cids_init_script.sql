@@ -1512,6 +1512,9 @@ declare
 	attrClass cs_class%ROWTYPE;
 	attrFieldName TEXT;
 	objectCount INTEGER;
+	foreignFieldName TEXT;
+	backreference TEXT;
+	
 begin
 	CREATE TEMP TABLE cs_attr_object_temp (class_id integer, object_id integer, attr_class_id integer, attr_object_id integer);
 	CREATE TEMP TABLE cs_attr_string_temp (class_id integer, attr_id integer, object_id integer, string_val text);
@@ -1521,11 +1524,21 @@ begin
 	FOR attr IN SELECT * FROM cs_attr WHERE class_id = classId LOOP	
 		--RAISE NOTICE '%     %', attr.field_name, class.table_name ;
 		IF attr.indexed THEN
-			query = 'SELECT ' || class.primary_key_field || ' AS pField, cast(' ||  attr.field_name || ' as text) AS fName FROM ' || class.table_name;
+			IF attr.foreign_key_references_to < 0 THEN
+				query = 'SELECT ' || class.primary_key_field || ' AS pField, cast(' ||  class.primary_key_field || ' as text) AS fName FROM ' || class.table_name;
+			ELSE
+				query = 'SELECT ' || class.primary_key_field || ' AS pField, cast(' ||  attr.field_name || ' as text) AS fName FROM ' || class.table_name;
+			END IF;
 			FOR obj IN EXECUTE query LOOP
 				IF attr.foreign_key THEN
 					SELECT cs_class.* INTO attrClass FROM cs_class, cs_type WHERE cs_type.class_id = cs_class.id AND cs_type.id = attr.type_id;
-					IF attrClass.array_link THEN
+					IF attr.foreign_key_references_to < 0 THEN
+						select field_name into backreference from cs_attr where class_id = abs(attr.foreign_key_references_to) and foreign_key_references_to = attr.class_id limit 1;
+						secQuery = 'SELECT id as id FROM ' || attrClass.table_name || ' WHERE ' || backreference  || ' =  ' || obj.pField;
+						FOR ids IN EXECUTE secQuery LOOP
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrClass.id, ids.id);
+						END LOOP;
+					ELSEIF attrClass.array_link THEN
 						secQuery = 'SELECT id as id FROM ' || attrClass.table_name || ' WHERE ' || attr.array_key  || ' =  ' || obj.pField;
 						FOR ids IN EXECUTE secQuery LOOP
 							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrClass.id, ids.id);
@@ -1558,7 +1571,7 @@ begin
 	
 end
 $BODY$
-  LANGUAGE 'plpgsql' VOLATILE
+  LANGUAGE plpgsql VOLATILE
   COST 100;
 
 
@@ -1640,7 +1653,8 @@ $BODY$
   COST 100;
 
 
-CREATE OR REPLACE FUNCTION "reindex"(class_id integer)
+
+CREATE OR REPLACE FUNCTION reindex(class_id integer)
   RETURNS void AS
 $BODY$
 declare
@@ -1656,7 +1670,7 @@ begin
                     UNION ALL
                     
                     SELECT ch.father,
-                           ch.child ,
+                           abs(ch.child) ,
                            dc.depth+1
                     FROM   derived_child dc,
                            cs_class_hierarchy ch
@@ -1664,8 +1678,8 @@ begin
                     )
              SELECT DISTINCT child
              FROM            derived_child LIMIT 100 LOOP
-		RAISE NOTICE 'reindex  %', ids ;
-		PERFORM reindexPure(ids);
+		RAISE NOTICE 'reindex  %', abs(ids) ;
+		PERFORM reindexPure(abs(ids));
 	END LOOP;
 
 	FOR ids IN WITH recursive derived_child(father,child,depth) AS
@@ -1678,7 +1692,7 @@ begin
                     UNION ALL
                     
                     SELECT ch.father,
-                           ch.child ,
+                           abs(ch.child) ,
                            dc.depth+1
                     FROM   derived_child dc,
                            cs_class_hierarchy ch
@@ -1686,17 +1700,91 @@ begin
                     )
              SELECT DISTINCT child
              FROM            derived_child dc join cs_class cc on (cc.id = dc.child) where cc.indexed LIMIT 100 LOOP
-		RAISE NOTICE 'reindexDerivedObjects  %', ids ;
-		PERFORM reindexDerivedObjects(ids);
+		RAISE NOTICE 'reindexDerivedObjects  %', abs(ids) ;
+		PERFORM reindexDerivedObjects(abs(ids));
 	END LOOP;
 end
 $BODY$
-  LANGUAGE 'plpgsql' VOLATILE
+  LANGUAGE plpgsql VOLATILE
   COST 100;
 
 
 
+CREATE OR REPLACE FUNCTION reindexpure(classid integer, objectid integer)
+  RETURNS void AS
+$BODY$
+declare
+	attr cs_attr%ROWTYPE;
+	obj RECORD;
+	ids RECORD;
+	objects RECORD;
+	class cs_class%ROWTYPE;
+	query TEXT;
+	secQuery TEXT;
+	attrClass cs_class%ROWTYPE;
+	attrFieldName TEXT;
+	objectCount INTEGER;
+	foreignFieldName TEXT;
+	backreference TEXT;
+	
+begin
+	CREATE TEMP TABLE cs_attr_object_temp (class_id integer, object_id integer, attr_class_id integer, attr_object_id integer);
+	CREATE TEMP TABLE cs_attr_string_temp (class_id integer, attr_id integer, object_id integer, string_val text);
+	
+	SELECT * INTO class FROM cs_class WHERE id = classId;
 
+	FOR attr IN SELECT * FROM cs_attr WHERE class_id = classId LOOP	
+		--RAISE NOTICE '%     %', attr.field_name, class.table_name ;
+		IF attr.indexed THEN
+			IF attr.foreign_key_references_to < 0 THEN
+				query = 'SELECT ' || class.primary_key_field || ' AS pField, cast(' ||  class.primary_key_field || ' as text) AS fName FROM ' || class.table_name || ' where id = ' || objectid;
+			ELSE
+				query = 'SELECT ' || class.primary_key_field || ' AS pField, cast(' ||  attr.field_name || ' as text) AS fName FROM ' || class.table_name || ' where id = ' || objectid;
+			END IF;
+			FOR obj IN EXECUTE query LOOP
+				IF attr.foreign_key THEN
+					SELECT cs_class.* INTO attrClass FROM cs_class, cs_type WHERE cs_type.class_id = cs_class.id AND cs_type.id = attr.type_id;
+					IF attr.foreign_key_references_to < 0 THEN
+						select field_name into backreference from cs_attr where class_id = abs(attr.foreign_key_references_to) and foreign_key_references_to = attr.class_id;
+						secQuery = 'SELECT id as id FROM ' || attrClass.table_name || ' WHERE ' || backreference  || ' =  ' || obj.pField;
+						FOR ids IN EXECUTE secQuery LOOP
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrClass.id, ids.id);
+						END LOOP;
+					ELSEIF attrClass.array_link THEN
+						secQuery = 'SELECT id as id FROM ' || attrClass.table_name || ' WHERE ' || attr.array_key  || ' =  ' || obj.pField;
+						FOR ids IN EXECUTE secQuery LOOP
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrClass.id, ids.id);
+						END LOOP;
+					ELSE
+						secQuery = 'select ' || class.table_name || '.' || attr.field_name || ' as fieldName from ' || class.table_name || ', ' || attrclass.table_name || ' WHERE ' || class.table_name || '.' || class.primary_key_field || ' = ' || obj.pField || ' AND ' || class.table_name || '.' || attr.field_name || ' = ' || attrClass.table_name || '.' || attrClass.primary_key_field;
+						EXECUTE secQuery into objects;
+						GET DIAGNOSTICS objectCount = ROW_COUNT;
+						IF objectCount = 1 THEN
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrClass.id, objects.fieldName);
+						ELSE
+							insert into cs_attr_object_temp (class_id, object_id, attr_class_id, attr_object_id) values (class.id, obj.pField, attrclass.id, -1);
+						END IF;
+					END IF;
+				ELSE 
+					IF obj.fName is not null THEN
+						INSERT INTO cs_attr_string_temp (class_id, attr_id, object_id, string_val) VALUES (classId, attr.id, obj.pField, obj.fName);
+					END IF;
+				END IF;
+			END LOOP;
+		END IF;
+	END LOOP;
+
+	DELETE FROM cs_attr_object WHERE class_id = class.id and object_id = objectid;
+	DELETE FROM cs_attr_string WHERE class_id = class.id and object_id = objectid;
+	INSERT INTO cs_attr_object ( class_id, object_id, attr_class_id, attr_object_id) (SELECT class_id, object_id, attr_class_id, attr_object_id FROM cs_attr_object_temp);
+	INSERT INTO cs_attr_string ( class_id, attr_id, object_id, string_val) (SELECT class_id, attr_id, object_id, string_val FROM cs_attr_string_temp);
+	DROP TABLE cs_attr_object_temp;
+	DROP TABLE cs_attr_string_temp;
+	
+end
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
 
 
 
