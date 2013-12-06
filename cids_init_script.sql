@@ -1940,36 +1940,3 @@ INSERT INTO cs_ug_membership (ug_id,usr_id) VALUES ((SELECT id FROM cs_ug WHERE 
 INSERT INTO cs_ug (name, domain, prio) VALUES ('Gäste', (SELECT id FROM cs_domain WHERE name = 'LOCAL'), 1);
 INSERT INTO cs_usr(login_name,password,last_pwd_change,administrator) VALUES('gast','cismet',(SELECT CURRENT_TIMESTAMP),false);
 INSERT INTO cs_ug_membership (ug_id,usr_id) VALUES ((SELECT id FROM cs_ug WHERE name ='Gäste'),(SELECT id FROM cs_usr WHERE login_name ='gast'));
-
-
--- Dynamic Children Helper
-
--- cs_dynamic_children_helper
-CREATE TABLE cs_dynamic_children_helper
-(
-  id numeric NOT NULL,
-  name character varying(256),
-  code text,
-  CONSTRAINT cs_dynamic_children_helper_pkey PRIMARY KEY (id)
-)
-WITH (
-  OIDS=FALSE
-);
-
--- cs_refresh_dynchilds_functions()
-CREATE OR REPLACE FUNCTION cs_refresh_dynchilds_functions()
-  RETURNS character varying AS
-$BODY$
-BEGIN
- 
-DROP schema csdc cascade;
-CREATE schema csdc;
-perform execute('CREATE OR REPLACE FUNCTION csdc.'||name||' RETURNS VARCHAR AS $$ select'''||regexp_replace(REPLACE(code,'''',''''''),'(.*?)<ds::param.*>(.*?)</ds::param>(.*?)',E'\\1''||$\\2||''\\3','g')||'''::varchar $$ LANGUAGE ''sql'';') FROM cs_dynamic_children_helper;
-    RETURN 'Functions refreshed';
-EXCEPTION
-    WHEN OTHERS THEN
-    RETURN 'Error occured';
-END;
-$BODY$
-  LANGUAGE plpgsql VOLATILE
-  COST 100;
