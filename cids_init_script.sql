@@ -1312,7 +1312,7 @@ INSERT INTO cs_attr ( class_id, type_id, name, field_name, foreign_key, foreign_
 DELETE FROM cs_type WHERE name = 'geom';
 
 -- Postgis gist index
-CREATE INDEX geo_index ON geom USING GIST ( geo_field GIST_GEOMETRY_OPS );
+CREATE INDEX geo_index ON geom USING GIST ( geo_field );
 --------------------------------------------------------------------
 
 -- geom wieder einfügen, noch zu prüfen, ob erlaubt
