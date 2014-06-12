@@ -1940,3 +1940,65 @@ INSERT INTO cs_ug_membership (ug_id,usr_id) VALUES ((SELECT id FROM cs_ug WHERE 
 INSERT INTO cs_ug (name, domain, prio) VALUES ('Gäste', (SELECT id FROM cs_domain WHERE name = 'LOCAL'), 1);
 INSERT INTO cs_usr(login_name,password,last_pwd_change,administrator) VALUES('gast','cismet',(SELECT CURRENT_TIMESTAMP),false);
 INSERT INTO cs_ug_membership (ug_id,usr_id) VALUES ((SELECT id FROM cs_ug WHERE name ='Gäste'),(SELECT id FROM cs_usr WHERE login_name ='gast'));
+
+CREATE OR REPLACE FUNCTION cidsObjectExists(cid integer, oid integer)
+  RETURNS boolean AS
+$BODY$
+declare
+    b boolean;
+    table_name varchar;
+    pk_field varchar;
+    s1 varchar;
+    s2 varchar;
+begin   
+    s1='select table_name,primary_key_field from cs_class where id='||cid;
+    execute(s1) into table_name,pk_field;
+    --raise NOTICE 'tablename:%', table_name;
+    --raise NOTICE 'pk:%', pk_field;
+
+
+    s2='select count(*)>0 from '||table_name ||' where ' || pk_field || '='||oid;
+    execute(s2) into b;
+
+    --raise NOTICE '%', s1;
+    --raise NOTICE '%', s2;
+
+    return b;
+exception
+    when OTHERS THEN
+    return false;
+end
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
+CREATE OR REPLACE FUNCTION execute(_command character varying)
+  RETURNS character varying AS
+$BODY$
+DECLARE _r int;
+BEGIN
+EXECUTE _command;
+    RETURN 'Yes: ' || _command || ' executed';
+EXCEPTION
+    WHEN OTHERS THEN
+    RETURN 'No:  ' || _command || ' failed';
+END;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
+
+CREATE OR REPLACE FUNCTION selexecute(_command character varying)
+  RETURNS SETOF record AS
+$BODY$
+DECLARE _r record;
+BEGIN
+for _R in EXECUTE _command  loop
+    return next _r;
+    end loop;
+    RETURN;
+END;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100
+  ROWS 1000;
