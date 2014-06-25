@@ -271,10 +271,10 @@ CREATE TABLE cs_java_class (
 
 
 --
--- Name: cs_locks_sequence; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: cs_locks_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE cs_locks_sequence
+CREATE SEQUENCE cs_locks_seq
     INCREMENT BY 1
     NO MAXVALUE
     NO MINVALUE
@@ -290,7 +290,7 @@ CREATE TABLE cs_locks (
     object_id integer,
     user_string character varying(256),
     additional_info character varying(256),
-    id integer DEFAULT NEXTVAL('cs_locks_sequence'::regclass) NOT NULL
+    id integer DEFAULT NEXTVAL('cs_locks_seq'::regclass) NOT NULL
 );
 
 
