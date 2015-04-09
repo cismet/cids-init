@@ -1910,6 +1910,42 @@ CREATE TABLE cs_config_attr_exempt (
     UNIQUE ( usr_id, key_id )
 );
 
+
+--
+-- Name: cs_scheduled_serveractions_sequence; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE cs_scheduled_serveractions_sequence
+    INCREMENT BY 1
+    NO MAXVALUE
+    NO MINVALUE
+    CACHE 1;
+
+
+--
+-- Name: cs_scheduled_serveractions; Type: TABLE; Schema: public; Owner: -; Tablespace:
+--
+
+CREATE TABLE cs_scheduled_serveractions (
+  id integer NOT NULL DEFAULT nextval(('cs_scheduled_serveractions_sequence'::text)::regclass),
+  key character varying,
+  params_json character varying,
+  body_json character varying,
+  start_timestamp timestamp without time zone,
+  execution_rule character varying,
+  execution_timestamp timestamp without time zone,
+  result_json character varying,
+  aborted boolean,
+  taskname character varying,
+  username character varying,
+  groupname character varying,
+  CONSTRAINT cs_scheduled_serveractions_pkey PRIMARY KEY (id)
+)
+WITH (
+  OIDS=FALSE
+);
+
+
 -- default config attr types
 
 INSERT INTO cs_config_attr_type (type, descr) VALUES ('C', 'regular configuration attribute, a simple string value');
