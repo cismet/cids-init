@@ -154,7 +154,7 @@ CREATE TABLE cs_cat_node (
     derive_permissions_from_class BOOLEAN DEFAULT true,
     iconfactory integer,
     icon character varying(512),
-    artifical_id varchar(200)
+    artificial_id varchar(200)
 );
 
 
