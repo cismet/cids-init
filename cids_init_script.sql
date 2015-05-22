@@ -1805,7 +1805,9 @@ CREATE SEQUENCE cs_config_attr_key_sequence
 
 CREATE TABLE cs_config_attr_key (
     id INTEGER PRIMARY KEY DEFAULT NEXTVAL('cs_config_attr_key_sequence'),
-    KEY VARCHAR(200) NOT NULL );
+    KEY VARCHAR(200) NOT NULL,
+    group_name VARCHAR(256) NOT NULL
+);
 
 
 --

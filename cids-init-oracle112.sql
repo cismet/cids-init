@@ -363,7 +363,8 @@ CREATE TABLE cs_stringrepcache (
 
 CREATE TABLE cs_config_attr_key (
     id INTEGER NOT NULL PRIMARY KEY,
-    KEY VARCHAR(200) NOT NULL 
+    KEY VARCHAR(200) NOT NULL,
+    group_name VARCHAR(256) NOT NULL 
 );
 
 CREATE TABLE cs_config_attr_value (
