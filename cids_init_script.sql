@@ -683,7 +683,11 @@ CREATE TABLE cs_usr (
     login_name character varying(32) NOT NULL,
     password character varying(16),
     last_pwd_change timestamp without time zone NOT NULL,
-    administrator BOOLEAN DEFAULT false NOT NULL
+    administrator BOOLEAN DEFAULT false NOT NULL,
+    pw_hash char(64),
+    salt char(16),
+    last_pw_hash char(64),
+    last_salt char(16)
 );
 
 
@@ -1978,6 +1982,41 @@ INSERT INTO cs_ug_membership (ug_id,usr_id) VALUES ((SELECT id FROM cs_ug WHERE 
 INSERT INTO cs_ug (name, domain, prio) VALUES ('Gäste', (SELECT id FROM cs_domain WHERE name = 'LOCAL'), 1);
 INSERT INTO cs_usr(login_name,password,last_pwd_change,administrator) VALUES('gast','cismet',(SELECT CURRENT_TIMESTAMP),false);
 INSERT INTO cs_ug_membership (ug_id,usr_id) VALUES ((SELECT id FROM cs_ug WHERE name ='Gäste'),(SELECT id FROM cs_usr WHERE login_name ='gast'));
+
+
+--- Funktion zur SALT Erzeugung
+CREATE OR REPLACE FUNCTION salt(integer) RETURNS text
+    AS '(SELECT array_to_string(array 
+       ( 
+              SELECT substr(''abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'', trunc(random() * 62)::INTEGER + 1, 1)
+              FROM   generate_series(1, $1)), ''''))'
+    LANGUAGE SQL
+    VOLATILE
+    RETURNS NULL ON NULL INPUT;
+
+--- Trigger-Funktion, die den Password-Hash aus dem Passwort erzeugt und das Passwort unkenntlich macht
+CREATE OR REPLACE FUNCTION set_pw() RETURNS trigger AS '    
+BEGIN
+    IF NEW.password IS NOT NULL THEN
+        NEW.salt = salt(16);
+        NEW.pw_hash = md5(NEW.salt || NEW.password);
+        NEW.password = ''*****'';
+        NEW.last_pwd_change = now();
+    END IF;
+
+    RETURN NEW;
+END;
+' LANGUAGE plpgsql; 
+
+--- Umstellung auf Passwort-Hash (einmalig)
+UPDATE cs_usr SET salt = salt(16);
+UPDATE cs_usr SET pw_hash = md5(salt || password);
+UPDATE cs_usr SET password = '*****';
+
+--- Trigger, der die Trigger-Funktion benutzt, wenn cs_usr geaendert wird
+CREATE TRIGGER password_trigger BEFORE INSERT OR UPDATE ON cs_usr FOR EACH ROW EXECUTE PROCEDURE set_pw();
+
+
 
 CREATE OR REPLACE FUNCTION cidsObjectExists(cid integer, oid integer)
   RETURNS boolean AS

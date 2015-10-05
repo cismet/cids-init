@@ -231,6 +231,10 @@
 |    password |character varying(16)
 |    last_pwd_change timestamp without time zone NOT NULL
 |    administrator |BOOLEAN DEFAULT false NOT NULL
+|    pw_hash |char(64)
+|    salt |char(16)
+|    last_pw_hash |char(64)
+|    last_salt |char(16)
 
 
 
