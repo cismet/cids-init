@@ -1997,14 +1997,13 @@ CREATE OR REPLACE FUNCTION salt(integer) RETURNS text
 --- Trigger-Funktion, die den Password-Hash aus dem Passwort erzeugt und das Passwort unkenntlich macht
 CREATE OR REPLACE FUNCTION set_pw() RETURNS trigger AS '    
 BEGIN
-    IF NEW.password IS NOT NULL THEN
-        NEW.salt = salt(16);
-        NEW.pw_hash = md5(NEW.salt || NEW.password);
-        NEW.password = ''*****'';
-        NEW.last_pwd_change = now();
-    END IF;
-
-    RETURN NEW;
+   IF NEW.password IS NOT NULL and NEW.password <> OLD.password THEN
+       NEW.salt = salt(16);
+       NEW.pw_hash = md5(NEW.salt || NEW.password);
+       NEW.password = ''*****'';
+       NEW.last_pwd_change = now();
+   END IF;
+  RETURN NEW;
 END;
 ' LANGUAGE plpgsql; 
 
