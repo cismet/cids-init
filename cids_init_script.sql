@@ -1995,17 +1995,26 @@ CREATE OR REPLACE FUNCTION salt(integer) RETURNS text
     RETURNS NULL ON NULL INPUT;
 
 --- Trigger-Funktion, die den Password-Hash aus dem Passwort erzeugt und das Passwort unkenntlich macht
-CREATE OR REPLACE FUNCTION set_pw() RETURNS trigger AS '    
+CREATE OR REPLACE FUNCTION set_pw()
+  RETURNS trigger AS
+'    
 BEGIN
-   IF NEW.password IS NOT NULL and NEW.password <> OLD.password THEN
+   IF TG_OP = ''INSERT'' THEN
+       NEW.salt = salt(16);
+       NEW.pw_hash = md5(NEW.salt || NEW.password);
+       NEW.password = ''*****'';
+       NEW.last_pwd_change = now();
+   elsif NEW.password IS NOT NULL and NEW.password <> OLD.password then
        NEW.salt = salt(16);
        NEW.pw_hash = md5(NEW.salt || NEW.password);
        NEW.password = ''*****'';
        NEW.last_pwd_change = now();
    END IF;
-  RETURN NEW;
+   RETURN NEW;
 END;
-' LANGUAGE plpgsql; 
+'
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
 
 --- Umstellung auf Passwort-Hash (einmalig)
 UPDATE cs_usr SET salt = salt(16);
