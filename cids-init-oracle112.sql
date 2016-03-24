@@ -294,7 +294,11 @@ CREATE TABLE cs_usr (
     login_name varchar(32) NOT NULL UNIQUE,
     password varchar(16),
     last_pwd_change timestamp NOT NULL,
-    administrator char(1) DEFAULT '0' NOT NULL CHECK (administrator in ('0', '1'))
+    administrator char(1) DEFAULT '0' NOT NULL CHECK (administrator in ('0', '1')),
+    pw_hash char(64),
+    salt char(16),
+    last_pw_hash char(64),
+    last_salt char(16)
 );
 
 CREATE TABLE geom
@@ -354,11 +358,13 @@ CREATE TABLE cs_history (
     PRIMARY KEY (class_id, object_id, valid_from)
 );
 
-CREATE TABLE cs_stringrepcache (
+CREATE TABLE cs_cache (
   class_id integer NOT NULL,
   object_id integer NOT NULL,
   stringrep varchar(512),
-  CONSTRAINT cid_oid PRIMARY KEY (class_id , object_id )
+  lightweight_json varchar(4000),
+  geometry SDO_GEOMETRY,
+  CONSTRAINT cs_cache_cid_oid PRIMARY KEY (class_id , object_id )
 );
 
 CREATE TABLE cs_config_attr_key (
@@ -1508,20 +1514,23 @@ END;
 /
 
 
-CREATE OR REPLACE PROCEDURE recreate_stringrepcache_class(classid IN INTEGER)
+
+CREATE OR REPLACE PROCEDURE recreate_cache_class(classid IN INTEGER)
   IS
-  attr_value VARCHAR2(2000);
+  packer_val VARCHAR2(2000);
+  fields_value VARCHAR2(2000);
   ins_stmt VARCHAR2(2100);
 BEGIN
-  DELETE FROM cs_stringrepcache WHERE class_id = classid;
+  DELETE FROM cs_cache WHERE class_id = classid;
   
-  SELECT attr_value INTO attr_value FROM cs_class_attr WHERE attr_key = 'tostringcache' AND class_id = classid;
+  SELECT attr_value INTO packer_val FROM cs_class_attr WHERE attr_key = 'cachepacker' AND class_id = classid;
+  SELECT attr_value INTO fields_value FROM cs_class_attr WHERE attr_key = 'caching' AND class_id = classid;
   
-  ins_stmt := 'INSERT INTO cs_stringrepcache (class_id, object_id, stringrep) SELECT ' || classid || ', '|| attr_value;
-  
+  ins_stmt := 'insert into cs_cache (class_id,object_id,'|| fields_value ||') select '||classid||','||packer_val;
+
   EXECUTE IMMEDIATE ins_stmt;
 EXCEPTION WHEN OTHERS THEN
-  DBMS_OUTPUT.PUT_LINE('Error occured while recreating the stringrepcache for class ' || classid);
+  DBMS_OUTPUT.PUT_LINE('Error occured while recreating the cache for class ' || classid);
   DBMS_OUTPUT.PUT_LINE('ERRM: ' || SQLERRM);
   DBMS_OUTPUT.PUT_LINE('CODE: ' || SQLCODE);
   RETURN;
@@ -1529,11 +1538,85 @@ END;
 /
 
 
-CREATE OR REPLACE PROCEDURE recreate_stringrepcache
+CREATE OR REPLACE PROCEDURE recreate_cache_table(tablename IN VARCHAR2)
+  IS
+  classId integer;
+BEGIN
+  select id into classId from cs_class where LOWER(table_name) = LOWER(tablename);
+  recreate_cache_class(classId);
+END;
+/
+
+
+CREATE OR REPLACE PROCEDURE recreate_cache
   IS
 BEGIN
-	FOR rec IN (SELECT c.id FROM cs_class c, cs_class_attr a WHERE c.id = a.class_id AND a.attr_key = 'tostringcache') LOOP
-		recreate_stringrepcache_class(rec.id);
+	FOR rec IN (SELECT c.id FROM cs_class c, cs_class_attr a WHERE c.id = a.class_id AND a.attr_key = 'cachepacker') LOOP
+		recreate_cache_class(rec.id);
 	END LOOP;
 END;
 /
+
+CREATE OR REPLACE PROCEDURE insert_cache_entry(objectid IN INTEGER, classid IN INTEGER)
+  IS
+  packer_val VARCHAR2(2000);
+  fields_value VARCHAR2(2000);
+  tablename VARCHAR2(2000);
+  ins_stmt VARCHAR2(2100);
+BEGIN
+  
+  SELECT attr_value INTO packer_val FROM cs_class_attr WHERE attr_key = 'cachepacker' AND class_id = classid;
+  SELECT attr_value INTO fields_value FROM cs_class_attr WHERE attr_key = 'caching' AND class_id = classid;
+  SELECT table_name INTO tablename FROM cs_class where id = classid;
+  
+  ins_stmt := 'INSERT into cs_cache (class_id,object_id,'|| fields_value ||') select '||classid||','||packer_val || 
+               CASE WHEN UPPER(packer_val) LIKE '%WHERE%' THEN ' AND ' ELSE ' where ' END || tablename || '.id'||'='||  objectid;
+
+
+  EXECUTE IMMEDIATE ins_stmt;
+END;
+/
+
+
+create or replace PROCEDURE update_cache_entry(objectid IN INTEGER, classid IN INTEGER)
+  IS
+  packer_val VARCHAR2(2000);
+  fields_value VARCHAR2(2000);
+  tablename VARCHAR2(2000);
+  upd_stmt VARCHAR2(2100);
+BEGIN
+  SELECT attr_value INTO packer_val FROM cs_class_attr WHERE attr_key = 'cachepacker' AND class_id = classid;
+  SELECT attr_value INTO fields_value FROM cs_class_attr WHERE attr_key = 'caching' AND class_id = classid;
+  SELECT table_name INTO tablename FROM cs_class where id = classid;
+  
+  upd_stmt := 'UPDATE cs_cache SET (object_id,'|| fields_value ||')=(SELECT '||packer_val || 
+        CASE WHEN UPPER(packer_val) LIKE '%WHERE%' THEN ' AND ' ELSE ' where ' END || tablename || '.id' ||'='|| objectid ||
+        ') WHERE class_id='||classid||' AND object_id='|| objectid;
+
+  EXECUTE IMMEDIATE upd_stmt;
+
+  IF SQL%ROWCOUNT = 0 THEN
+  	raise_application_error( -20001, 'No row affected by the update statement' );
+  END IF;
+END;
+/
+
+
+CREATE OR REPLACE PROCEDURE insert_cache_entry_table(objectid IN INTEGER, tablename IN VARCHAR2)
+  IS
+  classId integer;
+BEGIN
+  select id into classId from cs_class where LOWER(table_name) = LOWER(tablename);
+  insert_cache_entry(objectid, classId);
+END;
+/
+
+CREATE OR REPLACE PROCEDURE update_cache_entry_table(objectid IN INTEGER, tablename IN VARCHAR2)
+  IS
+  classId integer;
+BEGIN
+  select id into classId from cs_class where LOWER(table_name) = LOWER(tablename);
+  update_cache_entry(objectid, classId);
+END;
+/
+
