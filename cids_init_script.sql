@@ -15,32 +15,10 @@ SET escape_string_warning = off;
 
 SET search_path = public, pg_catalog;
 
---
--- Name: cs_all_attr_mapping_sequence; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE cs_all_attr_mapping_sequence
-    INCREMENT BY 1
-    NO MAXVALUE
-    NO MINVALUE
-    CACHE 1;
-
 
 SET default_tablespace = '';
 
 SET default_with_oids = false;
-
---
--- Name: cs_all_attr_mapping; Type: TABLE; Schema: public; Owner: -; Tablespace:
---
-
-CREATE TABLE cs_all_attr_mapping (
-    class_id integer NOT NULL,
-    object_id integer NOT NULL,
-    attr_class_id integer NOT NULL,
-    attr_object_id integer NOT NULL,
-    id integer DEFAULT NEXTVAL('cs_all_attr_mapping_sequence'::regclass) NOT NULL
-);
 
 
 --
@@ -837,14 +815,6 @@ ALTER TABLE ONLY cs_ug_class_perm
 
 
 --
--- Name: cs_all_attr_mapping_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace:
---
-
-ALTER TABLE ONLY cs_all_attr_mapping
-    ADD CONSTRAINT cs_all_attr_mapping_pkey PRIMARY KEY (id);
-
-
---
 -- Name: cs_cat_link_pkey; Type: CONSTRAINT; Schema: public; Owner: -; Tablespace:
 --
 
@@ -1097,27 +1067,6 @@ ALTER TABLE ONLY cs_usr
 --
 
 CREATE INDEX cl_idx ON cs_cat_node USING btree (class_id);
-
-
---
--- Name: cs_all_attr_mapping_index1; Type: INDEX; Schema: public; Owner: -; Tablespace:
---
-
-CREATE INDEX cs_all_attr_mapping_index1 ON cs_all_attr_mapping USING btree (class_id);
-
-
---
--- Name: cs_all_attr_mapping_index2; Type: INDEX; Schema: public; Owner: -; Tablespace:
---
-
-CREATE INDEX cs_all_attr_mapping_index2 ON cs_all_attr_mapping USING btree (attr_class_id);
-
-
---
--- Name: cs_all_attr_mapping_index3; Type: INDEX; Schema: public; Owner: -; Tablespace:
---
-
-CREATE INDEX cs_all_attr_mapping_index3 ON cs_all_attr_mapping USING btree (attr_object_id);
 
 
 --
