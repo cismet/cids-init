@@ -1714,6 +1714,10 @@ $BODY$
 declare
 	ids INTEGER;
 begin
+	delete from cs_attr_object;
+	delete from cs_attr_string;
+	delete from cs_attr_object_derived;
+
 	FOR ids IN SELECT id FROM cs_class LOOP
 		RAISE NOTICE 'reindex %', ids;
 		PERFORM reindexPure(ids);
