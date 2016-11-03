@@ -4,13 +4,6 @@
 --------------------------------------------------------------------------------
 
 
-CREATE TABLE cs_all_attr_mapping (
-    id integer NOT NULL PRIMARY KEY,
-    class_id integer NOT NULL,
-    object_id integer NOT NULL,
-    attr_class_id integer NOT NULL,
-    attr_object_id integer NOT NULL
-);
 
 CREATE TABLE cs_attr_object (
     class_id integer NOT NULL,
@@ -421,10 +414,6 @@ CREATE TABLE cs_config_attr_exempt (
 --------------------------------------------------------------------------------
 
 
-CREATE SEQUENCE cs_all_attr_mapping_sequence
-    INCREMENT BY 1
-    NOMAXVALUE
-    NOMINVALUE;
 
 CREATE SEQUENCE cs_attr_sequence
     INCREMENT BY 1
@@ -616,15 +605,6 @@ CREATE SEQUENCE cs_config_attr_exempt_sequence
 --------------------------------------------------------------------------------
 
 
-CREATE OR REPLACE TRIGGER cs_all_attr_mapping_id_trigger
-  BEFORE INSERT
-  ON cs_all_attr_mapping
-  FOR EACH ROW
-  WHEN (new.id is null)
-BEGIN
-  SELECT cs_all_attr_mapping_sequence.nextval INTO :new.id FROM DUAL;
-END;
-/
 
 CREATE OR REPLACE TRIGGER cs_attr_id_trigger
   BEFORE INSERT
@@ -1002,10 +982,6 @@ END;
 -- ================================ INDEXES ================================= --
 --------------------------------------------------------------------------------
 
-
-CREATE INDEX cs_all_attr_mapping_index1 ON cs_all_attr_mapping (class_id);
-CREATE INDEX cs_all_attr_mapping_index2 ON cs_all_attr_mapping (attr_class_id);
-CREATE INDEX cs_all_attr_mapping_index3 ON cs_all_attr_mapping (attr_object_id);
 
 CREATE INDEX attr_object_index ON cs_attr_object (class_id, object_id, attr_class_id, attr_object_id);
 
