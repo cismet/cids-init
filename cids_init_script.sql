@@ -2163,3 +2163,20 @@ $BODY$
   LANGUAGE plpgsql VOLATILE
   COST 100
   ROWS 1000;
+
+
+
+
+CREATE OR REPLACE FUNCTION execute_query(_command character varying)
+  RETURNS refcursor as 
+  $BODY$
+DECLARE 
+  curs1 refcursor;
+BEGIN
+  OPEN curs1 FOR EXECUTE _command;
+  return curs1;
+END;
+$BODY$
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  COST 100;
+
