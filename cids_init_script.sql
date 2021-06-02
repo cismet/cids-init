@@ -1444,34 +1444,94 @@ end
   COST 100;
 
 
-CREATE OR REPLACE FUNCTION update_cache_entry(classid integer, objectId integer)
+--start: create the postgres 9 or postgres 10 version of the update_cache_entry function
+
+CREATE OR REPLACE FUNCTION public.createFunction(
+	_command character varying)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+AS $BODY$
+
+DECLARE _r int;
+BEGIN
+EXECUTE _command;
+    RETURN 'Yes: ' || _command || ' executed';
+EXCEPTION
+    WHEN OTHERS THEN
+    RETURN 'No:  ' || _command || ' failed';
+END;
+
+$BODY$;
+  
+
+select case when substring(version(), position(' ' in version()) + 1,  (position('.' in version()) - position(' ' in version()) - 1) )::integer < 10 then
+createFunction('CREATE OR REPLACE FUNCTION update_cache_entry(classid integer, objectId integer)
   RETURNS void AS
-'
+''
 begin
     declare
         affectedRows INTEGER;
     BEGIN
-        execute ''UPDATE cs_cache SET (''|| fields.attr_value ||'')=(''||''f.''||replace(fields.attr_value,'','','',f.'')||'') FROM  (SELECT ''||packer.attr_value || 
-        CASE WHEN packer.attr_value ilike ''%where%'' THEN '' AND '' ELSE '' where '' END || cs_class.table_name || ''.id'' ||''=''|| objectid ||'') AS f(id,''|| fields.attr_value ||'') WHERE class_id=''||fields.class_id||''  AND object_id=''|| objectid 
+        execute ''''UPDATE cs_cache SET (''''|| fields.attr_value ||'''')=(''''||''''f.''''||replace(fields.attr_value,'''','''','''',f.'''')||'''') FROM  (SELECT ''''||packer.attr_value || 
+        CASE WHEN packer.attr_value ilike ''''%where%'''' THEN '''' AND '''' ELSE '''' where '''' END || cs_class.table_name || ''''.id'''' ||''''=''''|| objectid ||'''') AS f(id,''''|| fields.attr_value ||'''') WHERE class_id=''''||fields.class_id||''''  AND object_id=''''|| objectid 
         FROM    cs_class_attr fields,
             cs_class_attr packer,     
             cs_class 
         WHERE   fields.class_id=packer.class_id  AND 
-            fields.attr_key=''caching'' AND 
-            packer.attr_key=''cachepacker'' AND 
+            fields.attr_key=''''caching'''' AND 
+            packer.attr_key=''''cachepacker'''' AND 
             fields.class_id=cs_class.id AND 
             cs_class.id=classid;
 
         GET DIAGNOSTICS affectedRows = ROW_COUNT;
 
         if affectedRows = 0 then
-            raise exception ''no row affected by the update statement'';
+            raise exception ''''no row affected by the update statement'''';
         end if;
     END;
 end
-'
+''
   LANGUAGE plpgsql VOLATILE
-  COST 100;
+  COST 100;'::text)
+else 
+createFunction ('CREATE OR REPLACE FUNCTION update_cache_entry(classid integer, objectId integer)
+  RETURNS void AS
+''
+begin
+    declare
+        affectedRows INTEGER;
+    BEGIN
+        execute ''''UPDATE cs_cache SET (''''|| fields.attr_value ||'''')=ROW(''''||''''f.''''||replace(fields.attr_value,'''','''','''',f.'''')||'''') FROM  (SELECT ''''||packer.attr_value || 
+        CASE WHEN packer.attr_value ilike ''''%where%'''' THEN '''' AND '''' ELSE '''' where '''' END || cs_class.table_name || ''''.id'''' ||''''=''''|| objectid ||'''') AS f(id,''''|| fields.attr_value ||'''') WHERE class_id=''''||fields.class_id||''''  AND object_id=''''|| objectid 
+        FROM    cs_class_attr fields,
+            cs_class_attr packer,     
+            cs_class 
+        WHERE   fields.class_id=packer.class_id  AND 
+            fields.attr_key=''''caching'''' AND 
+            packer.attr_key=''''cachepacker'''' AND 
+            fields.class_id=cs_class.id AND 
+            cs_class.id=classid;
+
+        GET DIAGNOSTICS affectedRows = ROW_COUNT;
+
+        if affectedRows = 0 then
+            raise exception ''''no row affected by the update statement'''';
+        end if;
+    END;
+end
+''
+  LANGUAGE plpgsql VOLATILE
+  COST 100;'::text)
+
+end;
+
+DROP FUNCTION createFunction(character varying);
+
+--end: create the postgres 9 or postgres 10 version of the update_cache_entry function
+
 
 CREATE OR REPLACE FUNCTION recreate_cache()
   RETURNS void AS
@@ -1994,6 +2054,17 @@ CREATE TABLE cs_config_attr_exempt (
     UNIQUE ( usr_id, key_id )
 );
 
+--
+-- Name: cs_changed; Type: TABLE; Schema: public; Owner: -; Tablespace:
+--
+
+CREATE TABLE cs_changed
+(
+  class_id integer NOT NULL,
+  object_id integer NOT NULL,
+  "time" timestamp with time zone DEFAULT now(),
+  CONSTRAINT cs_changed_primary_key PRIMARY KEY (class_id, object_id)
+)
 
 --
 -- Name: cs_scheduled_serveractions_sequence; Type: SEQUENCE; Schema: public; Owner: -
@@ -2181,4 +2252,91 @@ END;
 $BODY$
   LANGUAGE plpgsql VOLATILE SECURITY DEFINER
   COST 100;
+
+
+
+CREATE OR REPLACE FUNCTION public.cs_refresh_changed()
+    RETURNS void
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE
+AS $BODY$
+DECLARE
+   ref Record;
+BEGIN
+
+	for ref in select id  from cs_class LOOP
+		raise notice 'check class %', ref.id;
+		perform cs_refresh_changed(ref.id);
+	end LOOP;
+END;
+$BODY$;
+
+
+CREATE OR REPLACE FUNCTION public.cs_refresh_changed(classId integer)
+    RETURNS void
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE
+AS $BODY$
+DECLARE
+   ref Record;
+   c integer;
+   t timestamp;
+   oid integer;
+   oidArray integer[];
+   queryToExecute text;
+BEGIN
+	--delete all objects from the cs_changed table, if this class should not be monitored
+	if not exists (select 1 from cs_class c join cs_class_attr a on (a.class_id = c.id) where attr_key ilike 'class_changed_monitoring_level' and (attr_value ilike 'class' or attr_value ilike 'object') and c.id = classId) then
+		delete from cs_changed where class_id = classId;
+	end if;
+
+	for ref in select c.id as class_id, c.table_name, a.attr_value from cs_class c join cs_class_attr a on (a.class_id = c.id) where attr_key ilike 'class_changed_monitoring_level' and c.id = classId LOOP
+		if ref.attr_value ilike 'object' then
+			select max(time), count(*) into t, c from cs_changed where class_id = ref.class_id;
+			
+			if c is not null and c = 1 then
+				select object_id into oid from cs_changed where class_id = ref.class_id;
+				
+				if oid = 0 then
+					delete from cs_changed where class_id = ref.class_id;
+					queryToExecute = 'insert into cs_changed (class_id, object_id, "time") (select ' || ref.class_id || ', id, ''' || t || ''' from ' || ref.table_name || ');';
+--					raise notice 'queryToExecute1 %', queryToExecute;
+					execute queryToExecute;
+				else 
+					queryToExecute = 'insert into cs_changed (class_id, object_id) (select ' || ref.class_id || ', id from ' || ref.table_name || ' where id <> ' || oid || ');';
+--					raise notice 'queryToExecute2 %', queryToExecute;
+					execute queryToExecute;
+				end if;
+			elsif c is null or c = 0 then
+				queryToExecute = 'insert into cs_changed (class_id, object_id) (select ' || ref.class_id || ', id from ' || ref.table_name || ');';
+--				raise notice 'queryToExecute3 %', queryToExecute;
+				execute queryToExecute;
+			else 
+				--there is more than one object from the given class
+				--remove the entry for the class, if one exists and add the missing entries
+				delete from cs_changed where class_id = ref.class_id and object_id = 0;
+				select array_agg(object_id) into oidArray from cs_changed where class_id = ref.class_id;
+				
+				queryToExecute = 'insert into cs_changed (class_id, object_id) (select ' || ref.class_id || ', id from ' || ref.table_name || ' where not (id = any (ARRAY[' || array_to_string(oidArray, ',') || '])));';
+--				raise notice 'queryToExecute4 %', queryToExecute;
+				execute queryToExecute;
+			end if;
+		elsif ref.attr_value ilike 'class' then
+			select max(time), count(*) into t, c from cs_changed where class_id = ref.class_id;
+			
+			if c is not null and c = 1 then
+				update cs_changed set object_id = 0 where class_id = ref.class_id;
+			elsif c is null or c = 0 then
+				insert into cs_changed (class_id, object_id) values (ref.class_id, 0);
+			else 
+				--there is more than one object from the given class
+				delete from cs_changed where class_id = ref.class_id;
+				insert into cs_changed (class_id, object_id, time) values (ref.class_id, 0, t);
+			end if;
+		end if;
+	end LOOP;
+END;
+$BODY$;
 
