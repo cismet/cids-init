@@ -1444,34 +1444,94 @@ end
   COST 100;
 
 
-CREATE OR REPLACE FUNCTION update_cache_entry(classid integer, objectId integer)
+--start: create the postgres 9 or postgres 10 version of the update_cache_entry function
+
+CREATE OR REPLACE FUNCTION public.createFunction(
+	_command character varying)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+AS $BODY$
+
+DECLARE _r int;
+BEGIN
+EXECUTE _command;
+    RETURN 'Yes: ' || _command || ' executed';
+EXCEPTION
+    WHEN OTHERS THEN
+    RETURN 'No:  ' || _command || ' failed';
+END;
+
+$BODY$;
+  
+
+select case when substring(version(), position(' ' in version()) + 1,  (position('.' in version()) - position(' ' in version()) - 1) )::integer < 10 then
+createFunction('CREATE OR REPLACE FUNCTION update_cache_entry(classid integer, objectId integer)
   RETURNS void AS
-'
+''
 begin
     declare
         affectedRows INTEGER;
     BEGIN
-        execute ''UPDATE cs_cache SET (''|| fields.attr_value ||'')=(''||''f.''||replace(fields.attr_value,'','','',f.'')||'') FROM  (SELECT ''||packer.attr_value || 
-        CASE WHEN packer.attr_value ilike ''%where%'' THEN '' AND '' ELSE '' where '' END || cs_class.table_name || ''.id'' ||''=''|| objectid ||'') AS f(id,''|| fields.attr_value ||'') WHERE class_id=''||fields.class_id||''  AND object_id=''|| objectid 
+        execute ''''UPDATE cs_cache SET (''''|| fields.attr_value ||'''')=(''''||''''f.''''||replace(fields.attr_value,'''','''','''',f.'''')||'''') FROM  (SELECT ''''||packer.attr_value || 
+        CASE WHEN packer.attr_value ilike ''''%where%'''' THEN '''' AND '''' ELSE '''' where '''' END || cs_class.table_name || ''''.id'''' ||''''=''''|| objectid ||'''') AS f(id,''''|| fields.attr_value ||'''') WHERE class_id=''''||fields.class_id||''''  AND object_id=''''|| objectid 
         FROM    cs_class_attr fields,
             cs_class_attr packer,     
             cs_class 
         WHERE   fields.class_id=packer.class_id  AND 
-            fields.attr_key=''caching'' AND 
-            packer.attr_key=''cachepacker'' AND 
+            fields.attr_key=''''caching'''' AND 
+            packer.attr_key=''''cachepacker'''' AND 
             fields.class_id=cs_class.id AND 
             cs_class.id=classid;
 
         GET DIAGNOSTICS affectedRows = ROW_COUNT;
 
         if affectedRows = 0 then
-            raise exception ''no row affected by the update statement'';
+            raise exception ''''no row affected by the update statement'''';
         end if;
     END;
 end
-'
+''
   LANGUAGE plpgsql VOLATILE
-  COST 100;
+  COST 100;'::text)
+else 
+createFunction ('CREATE OR REPLACE FUNCTION update_cache_entry(classid integer, objectId integer)
+  RETURNS void AS
+''
+begin
+    declare
+        affectedRows INTEGER;
+    BEGIN
+        execute ''''UPDATE cs_cache SET (''''|| fields.attr_value ||'''')=ROW(''''||''''f.''''||replace(fields.attr_value,'''','''','''',f.'''')||'''') FROM  (SELECT ''''||packer.attr_value || 
+        CASE WHEN packer.attr_value ilike ''''%where%'''' THEN '''' AND '''' ELSE '''' where '''' END || cs_class.table_name || ''''.id'''' ||''''=''''|| objectid ||'''') AS f(id,''''|| fields.attr_value ||'''') WHERE class_id=''''||fields.class_id||''''  AND object_id=''''|| objectid 
+        FROM    cs_class_attr fields,
+            cs_class_attr packer,     
+            cs_class 
+        WHERE   fields.class_id=packer.class_id  AND 
+            fields.attr_key=''''caching'''' AND 
+            packer.attr_key=''''cachepacker'''' AND 
+            fields.class_id=cs_class.id AND 
+            cs_class.id=classid;
+
+        GET DIAGNOSTICS affectedRows = ROW_COUNT;
+
+        if affectedRows = 0 then
+            raise exception ''''no row affected by the update statement'''';
+        end if;
+    END;
+end
+''
+  LANGUAGE plpgsql VOLATILE
+  COST 100;'::text)
+
+end;
+
+DROP FUNCTION createFunction(character varying);
+
+--end: create the postgres 9 or postgres 10 version of the update_cache_entry function
+
 
 CREATE OR REPLACE FUNCTION recreate_cache()
   RETURNS void AS
