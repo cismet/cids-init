@@ -2054,6 +2054,17 @@ CREATE TABLE cs_config_attr_exempt (
     UNIQUE ( usr_id, key_id )
 );
 
+--
+-- Name: cs_changed; Type: TABLE; Schema: public; Owner: -; Tablespace:
+--
+
+CREATE TABLE cs_changed
+(
+  class_id integer NOT NULL,
+  object_id integer NOT NULL,
+  "time" timestamp with time zone DEFAULT now(),
+  CONSTRAINT cs_changed_primary_key PRIMARY KEY (class_id, object_id)
+)
 
 --
 -- Name: cs_scheduled_serveractions_sequence; Type: SEQUENCE; Schema: public; Owner: -
@@ -2241,4 +2252,91 @@ END;
 $BODY$
   LANGUAGE plpgsql VOLATILE SECURITY DEFINER
   COST 100;
+
+
+
+CREATE OR REPLACE FUNCTION public.cs_refresh_changed()
+    RETURNS void
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE
+AS $BODY$
+DECLARE
+   ref Record;
+BEGIN
+
+	for ref in select id  from cs_class LOOP
+		raise notice 'check class %', ref.id;
+		perform cs_refresh_changed(ref.id);
+	end LOOP;
+END;
+$BODY$;
+
+
+CREATE OR REPLACE FUNCTION public.cs_refresh_changed(classId integer)
+    RETURNS void
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE
+AS $BODY$
+DECLARE
+   ref Record;
+   c integer;
+   t timestamp;
+   oid integer;
+   oidArray integer[];
+   queryToExecute text;
+BEGIN
+	--delete all objects from the cs_changed table, if this class should not be monitored
+	if not exists (select 1 from cs_class c join cs_class_attr a on (a.class_id = c.id) where attr_key ilike 'class_changed_monitoring_level' and (attr_value ilike 'class' or attr_value ilike 'object') and c.id = classId) then
+		delete from cs_changed where class_id = classId;
+	end if;
+
+	for ref in select c.id as class_id, c.table_name, a.attr_value from cs_class c join cs_class_attr a on (a.class_id = c.id) where attr_key ilike 'class_changed_monitoring_level' and c.id = classId LOOP
+		if ref.attr_value ilike 'object' then
+			select max(time), count(*) into t, c from cs_changed where class_id = ref.class_id;
+			
+			if c is not null and c = 1 then
+				select object_id into oid from cs_changed where class_id = ref.class_id;
+				
+				if oid = 0 then
+					delete from cs_changed where class_id = ref.class_id;
+					queryToExecute = 'insert into cs_changed (class_id, object_id, "time") (select ' || ref.class_id || ', id, ''' || t || ''' from ' || ref.table_name || ');';
+--					raise notice 'queryToExecute1 %', queryToExecute;
+					execute queryToExecute;
+				else 
+					queryToExecute = 'insert into cs_changed (class_id, object_id) (select ' || ref.class_id || ', id from ' || ref.table_name || ' where id <> ' || oid || ');';
+--					raise notice 'queryToExecute2 %', queryToExecute;
+					execute queryToExecute;
+				end if;
+			elsif c is null or c = 0 then
+				queryToExecute = 'insert into cs_changed (class_id, object_id) (select ' || ref.class_id || ', id from ' || ref.table_name || ');';
+--				raise notice 'queryToExecute3 %', queryToExecute;
+				execute queryToExecute;
+			else 
+				--there is more than one object from the given class
+				--remove the entry for the class, if one exists and add the missing entries
+				delete from cs_changed where class_id = ref.class_id and object_id = 0;
+				select array_agg(object_id) into oidArray from cs_changed where class_id = ref.class_id;
+				
+				queryToExecute = 'insert into cs_changed (class_id, object_id) (select ' || ref.class_id || ', id from ' || ref.table_name || ' where not (id = any (ARRAY[' || array_to_string(oidArray, ',') || '])));';
+--				raise notice 'queryToExecute4 %', queryToExecute;
+				execute queryToExecute;
+			end if;
+		elsif ref.attr_value ilike 'class' then
+			select max(time), count(*) into t, c from cs_changed where class_id = ref.class_id;
+			
+			if c is not null and c = 1 then
+				update cs_changed set object_id = 0 where class_id = ref.class_id;
+			elsif c is null or c = 0 then
+				insert into cs_changed (class_id, object_id) values (ref.class_id, 0);
+			else 
+				--there is more than one object from the given class
+				delete from cs_changed where class_id = ref.class_id;
+				insert into cs_changed (class_id, object_id, time) values (ref.class_id, 0, t);
+			end if;
+		end if;
+	end LOOP;
+END;
+$BODY$;
 
