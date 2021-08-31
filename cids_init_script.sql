@@ -2340,3 +2340,27 @@ BEGIN
 END;
 $BODY$;
 
+
+-- Function: cs_recreatecacheddaqview(text)
+
+-- DROP FUNCTION cs_recreatecacheddaqview(text);
+
+CREATE OR REPLACE FUNCTION cs_recreatecacheddaqview(viewname text)
+  RETURNS void AS
+$BODY$
+declare
+	e boolean;
+begin
+	execute 'SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE  table_schema = ''daq'' AND table_name   = ''' || viewName || '_cached'')' into e;
+
+	if (e is not null and e) then
+--		execute 'delete from daq.' || viewName || '_cached'; 
+		execute 'insert into daq.' || viewName || '_cached (md5, json, time, version, status) (select md5(json) as md5, json as json, now() as refreshed, ''version''::text as version, null::text from daq.' || viewName || ')';
+	else 
+		execute 'create table daq.' || viewName || '_cached as select json as json,md5(json) as md5, now() as time, ''version''::text as version, null::text as status from daq.' || viewName;
+	end if;
+end
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
