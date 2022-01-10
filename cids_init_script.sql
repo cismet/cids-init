@@ -1,3 +1,12 @@
+--- ##################################################################
+--- ##### DEPRECATED ! ###############################################
+--- ##################################################################
+--- use cids-create.sql/cids-init.sql instead
+--- (introduced in https://github.com/cismet/cids-init/issues/25)
+--- ##################################################################
+
+
+
 -- nur einzeilige kommentare erlaubt
 
 -- erster abschnitt cs_-Tabellen aus Dump erzeugt
